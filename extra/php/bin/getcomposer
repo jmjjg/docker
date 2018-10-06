@@ -1,0 +1,80 @@
+#!/bin/sh
+# @see https://getcomposer.org/doc/faqs/how-to-install-composer-programmatically.md
+# @see https://getcomposer.org/root
+
+(
+    set -o errexit
+    set -o nounset
+
+    __FILE__=$0
+    __VERSION__=1.0.0
+    __SCRIPT__=`basename $__FILE__`
+    __DIR__=`dirname "$0"`
+
+    SIGNATURE=""
+    OUTPUT="/usr/local/bin/composer"
+
+    cleanup()
+    {
+        rm -f \
+            /tmp/composer-setup.php.sha384 \
+            /tmp/composer-setup.php
+    }
+
+    usage()
+    {
+        printf "NAME\n"
+        printf "  %s\n" "$__SCRIPT__"
+        printf "VERSION\n"
+        printf "  %s\n" "$__VERSION__"
+        printf "\nDESCRIPTION\n"
+        printf "  Récupération et installation de la dernière version de composer dans /usr/local/bin\n"
+        printf "\nSYNOPSIS\n"
+        printf "  %s [OPTION]\n" "$__SCRIPT__"
+        printf "\nOPTIONS\n"
+        printf "  -h|--help\tAffiche cette aide\n"
+        printf "  -o|--output\tSpécifie le chemin complet vers le binaire composer (par défaut: )\n" "$OUTPUT"
+        printf "\nEXEMPLES\n"
+        printf "  %s\n" "$__SCRIPT__"
+        printf "  %s -h\n" "$__SCRIPT__"
+    }
+
+    opts=`getopt --longoptions help,output: -- ho: "$@"` \
+        || ( >&2 usage ; exit 1 )
+    eval set -- "$opts"
+    while true ; do
+        case "$1" in
+            -h|--help)
+                usage
+                exit 0
+            ;;
+            -o|--output)
+                OUTPUT="$2"
+                shift
+            ;;
+            --)
+                shift
+                break
+            ;;
+            *)
+                >&2 usage
+                exit 1
+            ;;
+        esac
+    done
+
+    cleanup
+    SIGNATURE="$(wget -q --no-check-certificate -O - https://composer.github.io/installer.sig)"
+    echo "$SIGNATURE composer-setup.php" > /tmp/composer-setup.php.sha384
+    wget -q --no-check-certificate -O /tmp/composer-setup.php https://getcomposer.org/installer
+
+    (cd /tmp/ && sha384sum --check composer-setup.php.sha384)
+    install_dir="`dirname "$OUTPUT"`"
+    mkdir -p "$install_dir"
+    filename="`basename "$OUTPUT"`"
+    php /tmp/composer-setup.php --quiet --install-dir="$install_dir" --filename="$filename"
+
+    cleanup
+    echo "Installation réussie de composer dans $OUTPUT"
+    exit 0
+) || (>&2 echo "Installation ratée" ; exit 1)
